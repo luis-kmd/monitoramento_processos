@@ -8,60 +8,126 @@ from datetime import datetime
 # Pega o nome do login do usuário no computador
 usuario = os.getlogin()
 
+# Defina o nome da janela que você deseja monitorar
+janela_nome = "(EXEMPLO)" 
+
+# Variável para guardar o tempo total de atividade (em segundos)
+tempo_atividade = 0  
+
 # Configurações de conexão com o SQL Server
 conn_str = (
     "DRIVER={SQL Server};"
-    "SERVER= ADRESS;"  # Troque pelo nome ou IP do servidor
-    "DATABASE= BASE;"  # Troque pelo nome do seu banco
-    "UID= USER;"  # Troque pelo seu usuário
-    "PWD= PASSWORD;"  # Troque pela sua senha
+    "SERVER=ADRESS;"  # Troque pelo nome ou IP do servidor
+    "DATABASE=DATABASE;"  # Troque pelo nome do seu banco
+    "UID=USER;"  # Troque pelo seu usuário
+    "PWD=PASSWORD;"  # Troque pela sua senha
 )
-conn = pyodbc.connect(conn_str)
-cursor = conn.cursor()
 
-# Variável pra guardar o tempo total de atividade (por segundo)
-tempo_atividade = 0
-janela_nome = "EXEMPLO"  # Nome parcial da janela que você quer monitorar
+# Função para conectar ao banco de dados
+def conectar_ao_banco():
+    while True:
+        try:
+            conn = pyodbc.connect(conn_str)
+            cursor = conn.cursor()
+            print("Conexão com o banco de dados estabelecida.")
+            return conn, cursor
+        except pyodbc.Error as e:
+            print(f"Erro de conexão com o banco de dados: {e}. Tentando novamente em 5 segundos...")
+            time.sleep(5)  # Espera 5 segundos antes de tentar reconectar
+
+# Função para inserir/atualizar o tempo de atividade no banco de dados
+def atualizar_tempo_no_banco(tempo_atividade, conn, cursor):
+    try:
+        # Captura a hora atual
+        hora_atual = datetime.now().time()
+        data_atual = datetime.now().strftime('%Y-%m-%d')
+
+        # Definir a coluna correta com base no período do dia
+        if hora_atual >= datetime.strptime('06:00:00', '%H:%M:%S').time() and hora_atual <= datetime.strptime('12:00:00', '%H:%M:%S').time():
+            # Período da manhã
+            cursor.execute('''
+            IF EXISTS (SELECT 1 FROM HorasTrabalhadas WHERE Usuario = ? AND Data = ?)
+            BEGIN
+                UPDATE HorasTrabalhadas
+                SET TempodeAtividade = TempodeAtividade + ?, HorasManha = ISNULL(HorasManha, 0) + ?
+                WHERE Usuario = ? AND Data = ?
+            END
+            ELSE
+            BEGIN
+                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, HorasManha)
+                VALUES (?, ?, ?, ?, ?)
+            END
+            ''', (usuario, data_atual, tempo_atividade, tempo_atividade, usuario, data_atual,
+                  usuario, data_atual, janela_nome, tempo_atividade, tempo_atividade))
+        
+        elif hora_atual > datetime.strptime('12:00:00', '%H:%M:%S').time() and hora_atual <= datetime.strptime('18:00:00', '%H:%M:%S').time():
+            # Período da tarde
+            cursor.execute('''
+            IF EXISTS (SELECT 1 FROM HorasTrabalhadas WHERE Usuario = ? AND Data = ?)
+            BEGIN
+                UPDATE HorasTrabalhadas
+                SET TempodeAtividade = TempodeAtividade + ?, HorasTarde = ISNULL(HorasTarde, 0) + ?
+                WHERE Usuario = ? AND Data = ?
+            END
+            ELSE
+            BEGIN
+                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, HorasTarde)
+                VALUES (?, ?, ?, ?, ?)
+            END
+            ''', (usuario, data_atual, tempo_atividade, tempo_atividade, usuario, data_atual,
+                  usuario, data_atual, janela_nome, tempo_atividade, tempo_atividade))
+        
+        elif hora_atual > datetime.strptime('18:00:00', '%H:%M:%S').time() and hora_atual <= datetime.strptime('23:59:59', '%H:%M:%S').time():
+            # Período da noite
+            cursor.execute('''
+            IF EXISTS (SELECT 1 FROM HorasTrabalhadas WHERE Usuario = ? AND Data = ?)
+            BEGIN
+                UPDATE HorasTrabalhadas
+                SET TempodeAtividade = TempodeAtividade + ?, HorasNoite = ISNULL(HorasNoite, 0) + ?
+                WHERE Usuario = ? AND Data = ?
+            END
+            ELSE
+            BEGIN
+                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, HorasNoite)
+                VALUES (?, ?, ?, ?, ?)
+            END
+            ''', (usuario, data_atual, tempo_atividade, tempo_atividade, usuario, data_atual,
+                  usuario, data_atual, janela_nome, tempo_atividade, tempo_atividade))
+
+        conn.commit()
+        print("Dados inseridos ou atualizados com sucesso!")
+    except pyodbc.Error as e:
+        print(f"Erro ao atualizar o banco de dados: {e}. Tentando novamente em 5 segundos...")
+        time.sleep(5)  # Espera 5 segundos antes de tentar novamente
 
 # Função pra pegar o título da janela ativa
 def get_janela_ativa():
-    janela = win32gui.GetForegroundWindow()
-    titulo_janela = win32gui.GetWindowText(janela)
-    return titulo_janela
+    try:
+        janela = win32gui.GetForegroundWindow()
+        titulo_janela = win32gui.GetWindowText(janela)
+        return titulo_janela
+    except Exception as e:
+        print(f"Erro ao pegar a janela ativa: {e}")
+        return ""
 
 # Função pra verificar se a janela ativa contém "EXEMPLO" no título
 def janela_ativa():
-    titulo_janela = get_janela_ativa()
-    if janela_nome.lower() in titulo_janela.lower():
-        return True
-    return False
-
-# Função para inserir/atualizar o tempo de atividade no banco de dados
-def atualizar_tempo_no_banco(tempo_atividade):
-    data_atual = datetime.now().strftime('%Y-%m-%d')
-
-# A query primeiro verifica se ja existe um registro no dia, se ja existir ele apenas da um update (soma), caso nao tenha, ele cria o registro e faz o processo anterior ate o fim do dia
-    cursor.execute('''
-    IF EXISTS (SELECT 1 FROM HorasProcessos WHERE Usuario = ? AND Data = ?)
-    BEGIN
-    UPDATE HorasProcessos
-    SET TempodeAtividade = TempodeAtividade + ?
-    WHERE Usuario = ? AND Data = ?
-    END
-    ELSE
-    BEGIN
-    INSERT INTO HorasProcessos (Usuario, Data, Processo, TempodeAtividade)
-    VALUES (?, ?, ?, ?)
-    END
-    ''', (usuario, data_atual, tempo_atividade, usuario, data_atual, 
-          usuario, data_atual, janela_nome, tempo_atividade))
-
-    conn.commit()
+    try:
+        titulo_janela = get_janela_ativa()
+        if janela_nome.lower() in titulo_janela.lower():
+            return True
+        return False
+    except Exception as e:
+        print(f"Erro ao verificar janela ativa: {e}")
+        return False
 
 # Função pra monitorar a atividade do mouse e teclado
 def monitorar_atividade():
-    global tempo_atividade
+    global tempo_atividade  # Tornando a variável global acessível dentro da função
     ativo = False
+
+    # Conecta ao banco de dados
+    conn, cursor = conectar_ao_banco()
 
     # Função que vai ser chamada sempre que houver movimento/click no mouse ou teclas pressionadas
     def on_any_activity(*args):
@@ -69,41 +135,45 @@ def monitorar_atividade():
         ativo = True
 
     # Listeners para mouse e teclado
-    mouse_listener = mouse.Listener(on_move=on_any_activity, on_click=on_any_activity)
-    keyboard_listener = keyboard.Listener(on_press=on_any_activity)
-
-    mouse_listener.start()
-    keyboard_listener.start()
-
     try:
-        while True:
-            if janela_ativa():
-                ativo = False
-                # Espera 1 segundo para registrar a atividade
-                time.sleep(1)
-                if ativo:
-                    tempo_atividade += 1
-                    print(f"Janela '{janela_nome}' ativa. Tempo de atividade: {tempo_atividade} segundos")
+        mouse_listener = mouse.Listener(on_move=on_any_activity, on_click=on_any_activity)
+        keyboard_listener = keyboard.Listener(on_press=on_any_activity)
 
-                # Atualiza o banco de dados a cada ciclo (1 segundo)
-                atualizar_tempo_no_banco(tempo_atividade)
+        mouse_listener.start()
+        keyboard_listener.start()
 
-                # Zera o tempo de atividade para o próximo ciclo
-                tempo_atividade = 0
-            else:
-                print(f"Janela '{janela_nome}' não encontrada ou não está ativa.")
-                time.sleep(5)
+        try:
+            while True:
+                if janela_ativa():
+                    ativo = False
+                    # Espera 1 segundo para registrar a atividade
+                    time.sleep(1)
+                    if ativo:
+                        tempo_atividade += 1
+                        print(f"Janela '{janela_nome}' ativa. Tempo de atividade: {tempo_atividade} segundos")
 
-    except KeyboardInterrupt:
-        print("Monitoramento encerrado.")
-    finally:
-        # Para os listeners quando o loop for interrompido
-        mouse_listener.stop()
-        keyboard_listener.stop()
+                    # Atualiza o banco de dados a cada ciclo (1 segundo)
+                    atualizar_tempo_no_banco(tempo_atividade, conn, cursor)
+
+                    # Zera o tempo de atividade para o próximo ciclo
+                    tempo_atividade = 0
+                else:
+                    print(f"Janela '{janela_nome}' não encontrada ou não está ativa.")
+                    time.sleep(2)
+
+        except KeyboardInterrupt:
+            print("Monitoramento encerrado.")
+        finally:
+            # Para os listeners quando o loop for interrompido
+            mouse_listener.stop()
+            keyboard_listener.stop()
+
+    except Exception as e:
+        print(f"Erro ao iniciar os listeners: {e}")
 
    
 if __name__ == "__main__":
-    monitorar_atividade()
-
-    # Fecha a conexão com o banco de dados
-    conn.close()
+    try:
+        monitorar_atividade()
+    except Exception as e:
+        print(f"Erro geral no monitoramento: {e}")
