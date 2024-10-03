@@ -5,7 +5,7 @@ CREATE TABLE HorasTrabalhadas (
     Processo VARCHAR(255) NOT NULL,    
     TempodeAtividade FLOAT NOT NULL,
     TempodeAtividadeFormatado VARCHAR(255),
-	SegundosManha FLOAT NULL, 
+    SegundosManha FLOAT NULL, 
     SegundosTarde FLOAT NULL, 
     SegundosNoite FLOAT NULL,
     UNIQUE(Usuario, Data)
