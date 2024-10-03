@@ -9,18 +9,18 @@ from datetime import datetime
 usuario = os.getlogin()
 
 # Defina o nome da janela que você deseja monitorar
-janela_nome = "(EXEMPLO)" 
+janela_nome = "(Remoto)"  # Nome parcial da janela que você quer monitorar
 
-# Variável para guardar o tempo total de atividade (em segundos)
-tempo_atividade = 0  
+# Inicializa a variável tempo_atividade
+tempo_atividade = 0  # Variável para guardar o tempo total de atividade (em segundos)
 
 # Configurações de conexão com o SQL Server
 conn_str = (
     "DRIVER={SQL Server};"
-    "SERVER=ADRESS;"  # Troque pelo nome ou IP do servidor
-    "DATABASE=DATABASE;"  # Troque pelo nome do seu banco
-    "UID=USER;"  # Troque pelo seu usuário
-    "PWD=PASSWORD;"  # Troque pela sua senha
+    "SERVER=tcon_john.sqlserver.dbaas.com.br;"  # Troque pelo nome ou IP do servidor
+    "DATABASE=tcon_john;"  # Troque pelo nome do seu banco
+    "UID=tcon_john;"  # Troque pelo seu usuário
+    "PWD=32412744;"  # Troque pela sua senha
 )
 
 # Função para conectar ao banco de dados
@@ -49,12 +49,12 @@ def atualizar_tempo_no_banco(tempo_atividade, conn, cursor):
             IF EXISTS (SELECT 1 FROM HorasTrabalhadas WHERE Usuario = ? AND Data = ?)
             BEGIN
                 UPDATE HorasTrabalhadas
-                SET TempodeAtividade = TempodeAtividade + ?, HorasManha = ISNULL(HorasManha, 0) + ?
+                SET TempodeAtividade = TempodeAtividade + ?, SegundosManha = ISNULL(SegundosManha, 0) + ?
                 WHERE Usuario = ? AND Data = ?
             END
             ELSE
             BEGIN
-                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, HorasManha)
+                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, SegundosManha)
                 VALUES (?, ?, ?, ?, ?)
             END
             ''', (usuario, data_atual, tempo_atividade, tempo_atividade, usuario, data_atual,
@@ -66,12 +66,12 @@ def atualizar_tempo_no_banco(tempo_atividade, conn, cursor):
             IF EXISTS (SELECT 1 FROM HorasTrabalhadas WHERE Usuario = ? AND Data = ?)
             BEGIN
                 UPDATE HorasTrabalhadas
-                SET TempodeAtividade = TempodeAtividade + ?, HorasTarde = ISNULL(HorasTarde, 0) + ?
+                SET TempodeAtividade = TempodeAtividade + ?, SegundosTarde = ISNULL(SegundosTarde, 0) + ?
                 WHERE Usuario = ? AND Data = ?
             END
             ELSE
             BEGIN
-                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, HorasTarde)
+                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, SegundosTarde)
                 VALUES (?, ?, ?, ?, ?)
             END
             ''', (usuario, data_atual, tempo_atividade, tempo_atividade, usuario, data_atual,
@@ -83,12 +83,12 @@ def atualizar_tempo_no_banco(tempo_atividade, conn, cursor):
             IF EXISTS (SELECT 1 FROM HorasTrabalhadas WHERE Usuario = ? AND Data = ?)
             BEGIN
                 UPDATE HorasTrabalhadas
-                SET TempodeAtividade = TempodeAtividade + ?, HorasNoite = ISNULL(HorasNoite, 0) + ?
+                SET TempodeAtividade = TempodeAtividade + ?, SegundosNoite = ISNULL(SegundosNoite, 0) + ?
                 WHERE Usuario = ? AND Data = ?
             END
             ELSE
             BEGIN
-                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, HorasNoite)
+                INSERT INTO HorasTrabalhadas (Usuario, Data, Processo, TempodeAtividade, SegundosNoite)
                 VALUES (?, ?, ?, ?, ?)
             END
             ''', (usuario, data_atual, tempo_atividade, tempo_atividade, usuario, data_atual,
@@ -110,7 +110,7 @@ def get_janela_ativa():
         print(f"Erro ao pegar a janela ativa: {e}")
         return ""
 
-# Função pra verificar se a janela ativa contém "EXEMPLO" no título
+# Função pra verificar se a janela ativa contém "Visual Rodopar" no título
 def janela_ativa():
     try:
         titulo_janela = get_janela_ativa()
